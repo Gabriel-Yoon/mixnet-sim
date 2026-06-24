@@ -46,17 +46,33 @@ bwd_flops = 2 · fwd_flops          # standard fwd:bwd ≈ 1:2 for GEMM-dominate
 ```
 forward_time_ms  = fwd_flops / (EFF_TFLOPS · 1e12) · 1e3
 backward_time_ms = 2 · forward_time_ms
-EFF_TFLOPS = 200          # effective GEMM throughput on H100/H200 (TF32/fp32 regime), TUNABLE
+EFF_TFLOPS = 67           # = H200 fp32 peak; CALIBRATED to the measured Dense (see below)
 ```
 `CostMetrics.forward_time/backward_time` are in **milliseconds** (CUDA-event units, matching the
-measured ops; e.g. a measured `Dense` forward ≈ 2.2 ms in the same graph).
+measured ops; e.g. a measured expert `Dense` forward ≈ 2.2 ms in the same graph).
 
-## Calibration / sanity check
-qwen3 per device (H=4096, S=1024, 1 sample):
-- `fwd_flops = 8·1024·4096² + 4·1024²·4096 = 1.37e11 + 1.72e10 ≈ 1.54e11`
-- `forward_time = 1.54e11 / 2.0e14 · 1e3 ≈ 0.77 ms`, backward ≈ 1.54 ms
-→ same order as the measured `Dense` (≈2.2 ms) in the graph → realistic proportion (not 0,
-not absurd). If the measured-vs-analytical proportion looks off after a run, tune `EFF_TFLOPS`.
+## Calibration of EFF_TFLOPS (against the measured Dense)
+FlexFlow `measure_operator_cost` runs the real op in **fp32**. We back out the effective throughput
+from a measured expert `Dense` GEMM and use the SAME value for the analytical attention (both are
+GEMM-dominated, so they share hardware efficiency):
+- a measured expert Dense (qwen3): fwd `2.198 ms`, mem in/out/weight = `5.03e7 / 1.34e8 / 5.04e7`
+  bytes (fp32 → /4 = elements: `MK=1.26e7, MN=3.36e7, KN=1.26e7`).
+- GEMM FLOPs `= 2·M·N·K = 2·√(MK·MN·KN) = 2·√(1.26e7·3.36e7·1.26e7) ≈ 1.46e11`.
+- effective `= 1.46e11 / 2.198e-3 ≈ 66.3 TFLOPS ≈ H200 fp32 peak (67)`.
+→ **EFF_TFLOPS = 67.** (The first draft used 200, which underestimated attention ~3× — 0.77 ms;
+67 gives ~2.3 ms, matching the measured Dense scale.)
+
+## Sanity check (qwen3, per device, H=4096, S=1024)
+- `fwd_flops = 8·1024·4096² + 4·1024²·4096 ≈ 1.546e11`
+- `forward_time = 1.546e11 / 67e12 · 1e3 ≈ 2.31 ms`, backward ≈ 4.62 ms
+
+## Attention's weight in the makespan (critical path, NOT a sum)
+A naive "sum of all op times" makes attention look ~0.1% — **misleading**, because the MoE has
+128–384 **expert Dense ops that run in PARALLEL across EP devices**. The makespan (and htsim) use
+the **critical path**, where each layer contributes **1 attention + 1 expert FFN** (not the sum of
+all experts). On that path: attention ≈ 2.3 ms vs expert up+down ≈ 4.4 ms →
+**attention ≈ 35–43% of per-layer compute**. So attention is significant, and getting EFF_TFLOPS
+right matters; it is now calibrated to the measured Dense.
 
 ## Assumptions & limitations (state in the paper)
 - 1 sample/device (gen scripts enforce `--batch-size == #devices`); for batch > devices,
