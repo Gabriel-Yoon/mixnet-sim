@@ -51,8 +51,12 @@ run_model(){
   [ -z "$s" ] && { echo "!! unknown model '$label'. known: $KNOWN"; return 1; }
   read -r hidden heads ehid experts topk dp tp pp batch <<< "$s"
   local gpus=$((dp*tp*pp*experts))
+  # batch MUST be >= #devices: --only-data-parallel splits the batch across all devices, so each
+  # device needs >=1 sample (else sub_query.dims[2]=0 -> cuDNN BAD_PARAM / zero-cost measures).
+  # Use batch = microbatch = #devices: 1 micro-batch, 1 sample/device (minimal memory, valid).
+  batch=$gpus
   local mb
-  for mb in "${MB_ARR[@]}"; do
+  for mb in "$gpus"; do
     local tag="${label}_dp${dp}tp${tp}pp${pp}_ep${experts}_mb${mb}_${NLAYERS}L_seq${SEQ}_${GPU_TAG}"
     echo "=================================================================="
     echo "[$label] $tag   logical GPUs = dp*tp*pp*ep = $gpus"
