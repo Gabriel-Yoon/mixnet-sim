@@ -3,4 +3,4 @@
 	url = git@github.com:Gabriel-Yoon/mixnet-htsim.git
 [submodule "mixnet-flexflow"]
 	path = mixnet-flexflow
-	url = https://github.com/mixnet-project/mixnet-flexflow.git
+	url = git@github.com:Gabriel-Yoon/mixnet-flexflow.git
