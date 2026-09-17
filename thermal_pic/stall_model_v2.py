@@ -29,6 +29,12 @@ MODELS = [
     ("Qwen-MoE-14.3B", "qwenmoe", "qwen_moe_14.3b_power_schedule_fwdbwd_{tag}.csv"),
     ("LLaMA-MoE-6.7B", "llamamoe", "llama_moe_6.7b_power_schedule_fwdbwd_{tag}.csv"),
 ]
+# schedules built from simulated per-device timelines (gen_power_schedule_from_htsim.py):
+# trace {key}_pic_transient_{traces}.csv, schedule {key}_power_schedule_{sched_tag}.csv
+MODELS_SIM = [
+    ("Mixtral-8x7B", "mixtral", "mixtral_power_schedule_{tag}.csv"),
+    ("LLaMA-MoE-6.7B", "llama", "llama_power_schedule_{tag}.csv"),
+]
 
 Q_FACTOR = 8000.0
 FWHM_PM = LAMBDA_NM * 1000.0 / Q_FACTOR
@@ -139,12 +145,34 @@ def per_round_stall(t, eps, eps_max, sched, dt_s):
     """Total stall time overlapping each all-to-all phase (after startup), ms."""
     per_round = []
     for s, e, ph, _ in sched:
-        if not ph.startswith("alltoall") or s < STARTUP_SKIP_S:
+        # synthetic schedules name the communication phases alltoall_*; timeline-derived
+        # schedules only know that the device is idle (waiting for all-to-all / pipeline)
+        if not (ph.startswith("alltoall") or ph == "idle") or s < STARTUP_SKIP_S:
             continue
         i0, i1 = bisect.bisect_left(t, s), bisect.bisect_left(t, e)
         stall = sum(dt_s for i in range(i0, i1) if eps[i] > eps_max) * 1000.0
         per_round.append(stall)
     return per_round
+
+
+def load_a2a_windows(path):
+    wins = []
+    with open(path) as f:
+        for r in csv.DictReader(f):
+            wins.append((float(r["ready_s"]), float(r["finish_s"]), r["info"], int(r["iteration"])))
+    return wins
+
+
+def per_a2a_round_stall(t, eps, eps_max, wins, dt_s):
+    """Stall time (ms) overlapping each all-to-all round [ready, finish] of the device's layer,
+    after startup; this is the quantity to inject per round in htsim."""
+    out = []
+    for s, e, info, it in wins:
+        if s < STARTUP_SKIP_S:
+            continue
+        i0, i1 = bisect.bisect_left(t, s), bisect.bisect_left(t, e)
+        out.append((sum(dt_s for i in range(i0, i1) if eps[i] > eps_max) * 1000.0, info, it))
+    return out
 
 
 def lorentz_rate_factor(eps_pm):
@@ -157,12 +185,14 @@ def main():
     ap.add_argument("--traces", default="L4seq4096")
     ap.add_argument("--sched-tag", default="L4seq4096",
                     help="suffix of the power-schedule CSVs (e.g. L4seq4096_hottest for per-device runs)")
+    ap.add_argument("--sim", action="store_true", help="use the timeline-derived schedule/trace naming")
     a = ap.parse_args()
     dt_s = a.dt_ms / 1000.0
     sched_tag = a.sched_tag
+    models = MODELS_SIM if a.sim else MODELS
     print(f"FWHM={FWHM_PM:.1f} pm eps_max={EPS_MAX_PM:.1f} pm; traces={a.traces}; tracker grid {a.dt_ms} ms")
     results = {}
-    for label, key, sched_fmt in MODELS:
+    for label, key, sched_fmt in models:
         tpath = f"{key}_pic_transient_{a.traces}.csv"
         if not os.path.exists(tpath):
             print(f"[{label}] missing {tpath}, skipped")
@@ -185,13 +215,32 @@ def main():
         rate = [lorentz_rate_factor(e) for e in eps[i_ss:]]
         # rate loss only during communication phases
         at = phase_lookup(sched)
-        comm_rate = [lorentz_rate_factor(eps[i]) for i in range(i_ss, len(t)) if at(t[i]).startswith("alltoall")]
+        comm_rate = [lorentz_rate_factor(eps[i]) for i in range(i_ss, len(t))
+                     if at(t[i]).startswith("alltoall") or at(t[i]) == "idle"]
 
         print(f"\n=== {label} ===")
         print(f"  steady swing {swing_pm:.0f} pm ({swing_pm/FWHM_PM:.1f} FWHM); closed-form stall {closed_form_ms:.0f} ms")
         print(f"  simulated (R_ctrl={R_CTRL_BASE} K/ms): {len(durs)} windows, mean {sum(durs)/len(durs):.1f} ms, max {max(durs):.1f} ms")
         print(f"  per a2a round ({n_rounds} rounds): stall overlapping comm mean {sum(rounds)/n_rounds:.1f} ms, "
               f"max {max(rounds):.1f} ms, rounds with any stall {sum(1 for r in rounds if r>0)}/{n_rounds}")
+        a2a_stats = None
+        if a.sim:
+            win_path = sched_fmt.format(tag=sched_tag).replace(".csv", "_a2a_windows.csv")
+            if os.path.exists(win_path):
+                wins = load_a2a_windows(win_path)
+                rs = per_a2a_round_stall(t, eps, EPS_MAX_PM, wins, dt_s)
+                n_it = len({it for _, _, it in rs})
+                vals = [v for v, _, _ in rs]
+                by_type = {}
+                for v, info, _ in rs:
+                    by_type.setdefault(info, []).append(v)
+                print(f"  TRUE a2a rounds of this device's layer ({len(vals)} rounds over {n_it} iterations): "
+                      f"stall per round mean {sum(vals)/len(vals):.1f} ms, max {max(vals):.1f} ms, "
+                      f"rounds with stall {sum(1 for v in vals if v>0)}/{len(vals)}; total stall on a2a per iteration "
+                      f"{sum(vals)/n_it:.1f} ms")
+                print("    by round type (mean ms): " + ", ".join(f"{k}: {sum(v)/len(v):.1f}" for k, v in by_type.items()))
+                a2a_stats = dict(mean_ms=sum(vals) / len(vals), max_ms=max(vals), per_iter_ms=sum(vals) / n_it,
+                                 n_rounds=len(vals), by_type={k: sum(v) / len(v) for k, v in by_type.items()})
         print(f"  Lorentzian graded model: mean link-rate factor during comm {sum(comm_rate)/len(comm_rate):.3f} "
               f"(i.e. {100*(1-sum(comm_rate)/len(comm_rate)):.1f}% effective bandwidth loss), min {min(comm_rate):.3f}")
 
@@ -242,7 +291,7 @@ def main():
                               comm_rate_factor=sum(comm_rate) / len(comm_rate),
                               r_sweep=sweep, r_zero_stall=thr,
                               ff_mean_ms=sum(r_ff) / len(r_ff), ff10x_mean_ms=sum(r_ff_fast) / len(r_ff_fast),
-                              heater_bias_mw=bias_mw)
+                              heater_bias_mw=bias_mw, a2a_rounds=a2a_stats)
     with open(f"stall_model_v2_{a.traces}.json", "w") as f:
         json.dump(results, f, indent=1)
     print(f"\nwrote stall_model_v2_{a.traces}.json")

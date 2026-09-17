@@ -29,6 +29,21 @@ IDLE_W = TDP_W * PHASE_FRACTION["alltoall_1"]   # 84 W
 GATE_MAX_MS = 1.5
 PAT = re.compile(r'COMPUTE_TASK dev=(-?\d+) id=(\d+) name="([^"]*)" type=(\w+) layer=(-?\d+) '
                  r'mb=(-?\d+) start_ps=(\d+) finish_ps=(\d+)')
+PAT_A2A = re.compile(r'A2A_ROUND id=(\d+) layer=(-?\d+) mb=(-?\d+) info="([^"]*)" '
+                     r'ready_ps=(\d+) start_ps=(\d+) finish_ps=(\d+)')
+
+
+def read_a2a_rounds(path):
+    op = gzip.open if path.endswith(".gz") else open
+    rounds = []
+    with op(path, "rt", errors="replace") as f:
+        for line in f:
+            m = PAT_A2A.search(line)
+            if m:
+                rid, layer, mb, info, ready, start, fin = m.groups()
+                rounds.append(dict(id=int(rid), layer=int(layer), mb=int(mb), info=info,
+                                   ready=int(ready) / 1e12, start=int(start) / 1e12, finish=int(fin) / 1e12))
+    return rounds
 
 
 def read_tasks(path):
@@ -130,6 +145,21 @@ def main():
                     continue
                 w.writerow([f"{a.model}-dev{dev}", it, "sim", ph, f"{off+s:.9f}", f"{off+e:.9f}", f"{e-s:.9f}", f"{pw:.4f}"])
     print(f"wrote {a.out}  ({len(phases)} phases per iteration x {a.iters} iterations, total {t_end*a.iters:.3f} s)")
+
+    # all-to-all rounds this device takes part in (rounds of the layer it hosts), repeated per
+    # iteration like the schedule; used by stall_model_v2 --a2a-windows for per-round stall
+    layers = sorted({t["layer"] for t in mine if t["layer"] >= 0})
+    rounds = [r for r in read_a2a_rounds(a.log) if r["layer"] in layers]
+    win_out = a.out.replace(".csv", "_a2a_windows.csv")
+    with open(win_out, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["iteration", "round_id", "layer", "mb", "info", "ready_s", "start_s", "finish_s"])
+        for it in range(1, a.iters + 1):
+            off = (it - 1) * t_end
+            for r in sorted(rounds, key=lambda r: r["ready"]):
+                w.writerow([it, r["id"], r["layer"], r["mb"], r["info"], f"{off+r['ready']:.9f}",
+                            f"{off+r['start']:.9f}", f"{off+r['finish']:.9f}"])
+    print(f"wrote {win_out}  (device layer(s) {layers}: {len(rounds)} a2a rounds per iteration)")
 
 
 if __name__ == "__main__":
