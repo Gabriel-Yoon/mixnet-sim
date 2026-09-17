@@ -61,16 +61,19 @@ def resample(t, T, dt_s):
 
 
 def track(t, dlam, r_pm_per_ms, feedforward=None):
-    """Rate-limited tracker. feedforward: optional list of target detunings per sample the
-    controller is allowed to jump toward (schedule-aware pre-bias); None = pure feedback."""
-    lam = [0.0] * len(t)
-    for i in range(1, len(t)):
+    """Rate-limited feedback tracker. With `feedforward` (a predicted detuning per sample),
+    the heater is pre-driven to the prediction (the actuator itself is us-fast, so this
+    part is not slew-limited) and the slew-limited feedback loop only corrects the
+    prediction error dlam - prediction."""
+    n = len(t)
+    pred = [0.0] * n if feedforward is None else feedforward
+    corr = [0.0] * n
+    for i in range(1, n):
         dt_ms = (t[i] - t[i - 1]) * 1000.0
-        target = dlam[i] if feedforward is None else feedforward[i]
-        desired = target - lam[i - 1]
+        desired = (dlam[i] - pred[i]) - corr[i - 1]
         step = max(-r_pm_per_ms * dt_ms, min(r_pm_per_ms * dt_ms, desired))
-        lam[i] = lam[i - 1] + step
-    return [abs(dlam[i] - lam[i]) for i in range(len(t))]
+        corr[i] = corr[i - 1] + step
+    return [abs(dlam[i] - pred[i] - corr[i]) for i in range(n)]
 
 
 def windows(t, eps, eps_max, tmin):
@@ -116,6 +119,19 @@ def periodic_prediction_targets(t, dlam, sched, dt_s, n_iters=10, model_error_fr
     tgt = list(dlam)
     for i in range(n_p, len(dlam)):
         tgt[i] = dlam[i - n_p] * (1.0 - model_error_frac)
+    return tgt
+
+
+def jittered_prediction_targets(t, dlam, sched, dt_s, jitter_ms, n_iters=10):
+    """Feed-forward with timing error: the predicted trajectory is the previous iteration's
+    shifted by `jitter_ms` (all-to-all durations vary with routing, so the next burst
+    does not land exactly where predicted). Residual during a burst ~ slope x jitter."""
+    period_s = sched[-1][1] / n_iters
+    n_p = int(round(period_s / dt_s))
+    n_j = int(round(jitter_ms / 1000.0 / dt_s))
+    tgt = list(dlam)
+    for i in range(n_p + n_j, len(dlam)):
+        tgt[i] = dlam[i - n_p - n_j]
     return tgt
 
 
@@ -198,8 +214,18 @@ def main():
             ff_res[err] = (sum(r_ff) / len(r_ff), max(r_ff))
         print("  feed-forward (previous-iteration prediction) @ base R_ctrl, stall per round mean/max ms by "
               "prediction error: " + ", ".join(f"{int(e*100)}%: {m:.1f}/{mx:.1f}" for e, (m, mx) in ff_res.items()))
+        jit_res = {}
+        for jit in (2.0, 5.0, 10.0, 20.0):
+            ff = jittered_prediction_targets(t, dlam, sched, dt_s, jit)
+            e_ff = track(t, dlam, r_base, feedforward=ff)
+            r_ff = per_round_stall(t, e_ff, EPS_MAX_PM, sched, dt_s)
+            e_ff10 = track(t, dlam, r_base * 10, feedforward=ff)
+            r_ff10 = per_round_stall(t, e_ff10, EPS_MAX_PM, sched, dt_s)
+            jit_res[jit] = (sum(r_ff) / len(r_ff), max(r_ff), sum(r_ff10) / len(r_ff10))
+        print("  feed-forward with timing jitter (ms) -> stall per round mean/max @ base R_ctrl | mean @ 10x: " +
+              ", ".join(f"{j:g}: {m:.1f}/{mx:.1f} | {m10:.1f}" for j, (m, mx, m10) in jit_res.items()))
         r_ff = [ff_res[0.0][0]]
-        r_ff_fast = [ff_res[0.10][0]]
+        r_ff_fast = [jit_res[10.0][0]]
 
         # heater bias / FSR
         swing_nm = swing_pm / 1000.0
