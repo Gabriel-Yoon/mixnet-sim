@@ -28,8 +28,8 @@ Implications for the manuscript:
 - ln_athermal_broadband: P. Han, L. Yang, L. Xu, X. Zhou, L. Cai, A. M. Agarwal, J. Michel, L. C. Kimerling,
   L. Zhang, "Broadband Athermal Lithium Niobate Microresonators Across C and L Bands," J. Lightwave Technol.
   42, 3246-3250, 2024 (IEEE Xplore 10415485) — LN/TiO2 hybrid, |dlambda/dT| <= 1 pm/K over 1480-1630 nm.
-- lnoi_ring_thermo: Photonics 10(4):424, 2023, doi 10.3390/photonics10040424 — LNOI microring thermo-optic
-  sensitivity 26.33 pm/C (authors: see fetch).
+- (MDPI sources are NOT to be used — user rule.) Bare-LN-ring thermo-optic sensitivity must come from
+  Ling et al. OE 2020 (uncladded reference device) or another Optica/IEEE/APS source.
 
 ## 2. Residual thermal drift is not removed by changing the actuator
 - LN ring thermo-optic sensitivity: ~26 pm/K (LNOI ring, literature) vs 80 pm/K for Si.
