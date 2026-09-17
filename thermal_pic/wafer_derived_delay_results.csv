@@ -1,0 +1,5 @@
+model,nodes,thermal_delay_ns,derived_from,final_finish_ps,final_finish_ms,wall_s
+llama-moe-6.7b,128,0,baseline,102289768117,102.2898,191
+mixtral8x7b,256,0,baseline,411041025755,411.0410,382
+llama-moe-6.7b,128,62230000,ansys_derived,1442510396108,1442.5104,185
+mixtral8x7b,256,73020000,ansys_derived,2680257363829,2680.2574,338
