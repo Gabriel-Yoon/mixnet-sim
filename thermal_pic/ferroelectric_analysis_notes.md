@@ -41,6 +41,16 @@ Implications for the manuscript:
   < 19.4 pm budget -> NO tracking needed during training; ferroelectric tuner becomes a
   one-time non-volatile trim for fabrication/aging offsets.
 
+## 3a. CORRECTION (from Job A a2a data): the fbuf has 8 micro-batches per iteration (128 a2a
+rounds = 4 layers x 2 dirs x 2 ops x 8 mb; batch 128 / dp 2 = 64 sequences per replica / 8 =
+8 micro-batches), not 16. All "x16" factors below become x8: stall-window switches per
+iteration 47 / 24 / 31 (Mixtral / Qwen / LLaMA), analog tracking writes ~2,400 / 1,170 / 2,400.
+Conclusions unchanged (still >= 1e7 well before 1e6 iterations for tracking; 4.7e7 / 2.4e7 /
+3.1e7 for the stall-window count at 1e6 iterations).
+Also from Job A (llama): real a2a rounds are 0.37 ms mean / 0.84 ms max, vs 350 ms assumed —
+the thermal schedule is being rebuilt from the simulated per-device timeline
+(gen_power_schedule_from_htsim.py), so every swing/stall number here will be refreshed.
+
 ## 3. Endurance, recounted
 Per TRUE training iteration (batch 128 / microbatch 8 = 16 microbatches; the thermal "iteration"
 in the current paper is one microbatch through one layer):
