@@ -41,15 +41,19 @@ Implications for the manuscript:
   < 19.4 pm budget -> NO tracking needed during training; ferroelectric tuner becomes a
   one-time non-volatile trim for fabrication/aging offsets.
 
-## 3a. CORRECTION (from Job A a2a data): the fbuf has 8 micro-batches per iteration (128 a2a
-rounds = 4 layers x 2 dirs x 2 ops x 8 mb; batch 128 / dp 2 = 64 sequences per replica / 8 =
-8 micro-batches), not 16. All "x16" factors below become x8: stall-window switches per
-iteration 47 / 24 / 31 (Mixtral / Qwen / LLaMA), analog tracking writes ~2,400 / 1,170 / 2,400.
-Conclusions unchanged (still >= 1e7 well before 1e6 iterations for tracking; 4.7e7 / 2.4e7 /
-3.1e7 for the stall-window count at 1e6 iterations).
-Also from Job A (llama): real a2a rounds are 0.37 ms mean / 0.84 ms max, vs 350 ms assumed —
-the thermal schedule is being rebuilt from the simulated per-device timeline
-(gen_power_schedule_from_htsim.py), so every swing/stall number here will be refreshed.
+## 3a. CORRECTION (from Job A a2a data): the simulated iteration contains 4 micro-batch ids
+(mb=0..3), each with 32 a2a rounds (= 4 layers x 2 ops x 2 dirs x 2 DP replicas) -> 128 rounds.
+Per device (one replica, one layer): 4 micro-batches x 4 bursts = 16 bursts per simulated
+iteration, i.e. a x4 factor on the one-micro-batch thermal cycle, not x16. Stall-window
+switches per iteration: 24 / 12 / 16 (Mixtral / Qwen / LLaMA); analog tracking writes
+~1,200 / 590 / 1,200. Conclusions unchanged (tracking exhausts 1e7 within ~1e4 iterations).
+OPEN: Table 2 says batch 128 / micro-batch 8 (=> 16 micro-batches per iteration); the fbuf
+encodes 4 micro-batch ids (FlexFlow --microbatchsize 8 under dp=2 = 4 samples per replica).
+Resolve before the manuscript states a per-iteration count; moot once the schedule is built
+from the simulated timeline (counts are then per simulated iteration by construction).
+Real a2a rounds (Job A, paper matrices): LLaMA 0.37 ms mean / 0.84 max; Mixtral 13.2 / 54.5;
+Qwen 25.8 / 137.8 — vs 350 ms assumed (27x-1000x). Mixtral/Qwen rounds are long because their
+EP blocks (32 / 64 GPUs) span 2 / 4 wafers and cross the 200 GB/s gateways.
 
 ## 3. Endurance, recounted
 Per TRUE training iteration (batch 128 / microbatch 8 = 16 microbatches; the thermal "iteration"

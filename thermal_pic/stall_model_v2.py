@@ -155,9 +155,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dt-ms", type=float, default=0.5)
     ap.add_argument("--traces", default="L4seq4096")
+    ap.add_argument("--sched-tag", default="L4seq4096",
+                    help="suffix of the power-schedule CSVs (e.g. L4seq4096_hottest for per-device runs)")
     a = ap.parse_args()
     dt_s = a.dt_ms / 1000.0
-    sched_tag = "L4seq4096"
+    sched_tag = a.sched_tag
     print(f"FWHM={FWHM_PM:.1f} pm eps_max={EPS_MAX_PM:.1f} pm; traces={a.traces}; tracker grid {a.dt_ms} ms")
     results = {}
     for label, key, sched_fmt in MODELS:
