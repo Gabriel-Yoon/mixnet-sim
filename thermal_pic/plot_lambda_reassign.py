@@ -91,22 +91,28 @@ def draw_wafer(ax, lam, title):
     ax.set_aspect("equal")
     ax.axis("off")
     ax.set_title(title, fontsize=9.5, color=INK, loc="left")
+    sx, sy = col(SRC), ROWS - 1 - row(SRC)
+    # arrows first (behind the boxes); nearer destinations get a small lateral offset so the
+    # three row (column) arrows do not lie on top of each other
+    for v, l in lam.items():
+        x, y = col(v), ROWS - 1 - row(v)
+        k = (abs(x - sx) + abs(y - sy))          # 1, 2, 3 hops away
+        off = 0.11 * (k - 2)
+        if col(v) != sx:
+            p0, p1 = (sx, sy + off), (x, y + off)
+        else:
+            p0, p1 = (sx + off, sy), (x + off, y)
+        ax.add_patch(FancyArrowPatch(p0, p1, arrowstyle="-|>", mutation_scale=7,
+                                     shrinkA=10, shrinkB=10, linewidth=0.5 + 3.0 * l / 128,
+                                     color=BLUE, alpha=0.75, zorder=1))
     for g in range(N):
         x, y = col(g), ROWS - 1 - row(g)
         hot = loadf[g] >= 1.5
         fc = ORANGE if hot else ("#dcdbd3" if g != SRC else BLUE)
-        ax.add_patch(Rectangle((x - 0.32, y - 0.32), 0.64, 0.64, facecolor=fc, edgecolor="none"))
-        ax.text(x, y, f"G{g}", ha="center", va="center", fontsize=7,
+        ax.add_patch(Rectangle((x - 0.32, y - 0.32), 0.64, 0.64, facecolor=fc, edgecolor="none", zorder=2))
+        label = f"G{g}\n{lam[g]}λ" if g in lam else f"G{g}"
+        ax.text(x, y, label, ha="center", va="center", fontsize=6.5, zorder=3,
                 color="white" if (hot or g == SRC) else SEC_INK)
-    sx, sy = col(SRC), ROWS - 1 - row(SRC)
-    for v, l in lam.items():
-        x, y = col(v), ROWS - 1 - row(v)
-        ax.add_patch(FancyArrowPatch((sx, sy), (x, y), arrowstyle="-|>", mutation_scale=8,
-                                     shrinkA=12, shrinkB=12, linewidth=0.6 + 3.2 * l / 128,
-                                     color=BLUE, alpha=0.85, zorder=3))
-        ax.text(x + (0.36 if col(v) != sx else 0.0), y + (0.0 if col(v) != sx else 0.40),
-                f"{l}λ", fontsize=7, color=INK, ha="left" if col(v) != sx else "center",
-                va="center" if col(v) != sx else "bottom")
 
 
 ax0 = fig.add_subplot(gs[0, 0])
@@ -125,12 +131,14 @@ ax2.bar([x + 0.19 for x in xs], [after[v] for v in dests], width=0.36, color=BLU
 for x, v in zip(xs, dests):
     ax2.text(x + 0.19, after[v] + 3, str(after[v]), ha="center", fontsize=7, color=INK)
 ax2.axhline(CAP * UNIFORM, color=SEC_INK, linewidth=0.8, linestyle="--")
-ax2.text(len(dests) - 0.5, CAP * UNIFORM + 3, "cap 2× (ring over-provision)", fontsize=6.5, color=SEC_INK, ha="right")
+ax2.text(1.5, CAP * UNIFORM + 3, "cap 2× (ring over-provision)", fontsize=6.5, color=SEC_INK, ha="center")
+ax2.set_ylim(0, 178)
 ax2.set_xticks(list(xs))
-ax2.set_xticklabels([f"G0→G{v}\n({'row' if row(v) == row(SRC) else 'col'})" for v in dests], fontsize=7)
+ax2.set_xticklabels([f"G{v}\n{'row' if row(v) == row(SRC) else 'col'}" for v in dests], fontsize=7)
+ax2.set_xlabel("destination of G0's link", fontsize=8)
 ax2.set_ylabel("wavelengths on link", fontsize=8.5)
 ax2.set_title("(c) Source G0: λ per outgoing link", fontsize=9.5, color=INK, loc="left")
-ax2.legend(frameon=False, fontsize=7, loc="upper left")
+ax2.legend(frameon=False, fontsize=7, loc="upper left", ncol=2)
 ax2.grid(True, axis="y", color=GRID, linewidth=0.6)
 for s in ("top", "right"):
     ax2.spines[s].set_visible(False)
@@ -143,14 +151,15 @@ xs = range(N)
 ax3.bar(list(xs), rx_after, width=0.7, color=[ORANGE if loadf[g] >= 1.5 else BLUE for g in range(N)])
 ax3.axhline(384, color=MUTED, linewidth=1.2, label="before: 384 rings on, all GPUs")
 ax3.axhline(max(rx_after), color=SEC_INK, linewidth=0.8, linestyle="--")
-ax3.text(N - 0.5, max(rx_after) + 8, f"max {max(rx_after)} → {max(rx_after)/384:.2f}× rings", fontsize=6.5,
-         color=SEC_INK, ha="right")
+ax3.text(-0.4, max(rx_after) + 12, f"max {max(rx_after)} = {max(rx_after)/384:.2f}× uniform", fontsize=6.5,
+         color=SEC_INK, ha="left")
 ax3.set_xticks(list(xs))
 ax3.set_xticklabels([str(g) for g in range(N)], fontsize=6.5)
 ax3.set_xlabel("destination GPU", fontsize=8)
 ax3.set_ylabel("Rx rings on resonance", fontsize=8.5)
 ax3.set_title("(d) After: active drop rings per GPU", fontsize=9.5, color=INK, loc="left")
-ax3.legend(frameon=False, fontsize=7, loc="lower left")
+ax3.set_ylim(0, 660)
+ax3.legend(frameon=False, fontsize=7, loc="upper right")
 ax3.grid(True, axis="y", color=GRID, linewidth=0.6)
 for s in ("top", "right"):
     ax3.spines[s].set_visible(False)
