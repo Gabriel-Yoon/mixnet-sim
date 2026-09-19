@@ -67,6 +67,13 @@ XPU_PEAK_TARGET_W = 700.0  # Coenen's baseline XPU input power (Sec. II-B, III-B
 
 DT_MAX_S = 1e-3   # maximum transient time step [s]; must be << the ~16 ms XPU thermal time constant
 
+# Optional cold-plate thermal mass above the XPU (sensitivity to the cooling stack). Coenen's
+# HTC is applied directly at the XPU top, i.e. an in-die Si microchannel plate of negligible
+# mass; a conventional lidded/cold-plate package adds seconds of thermal time constant (the
+# H100 telemetry of Job C measured tau = 7-9 s). Set via CLI arg 4: "cp=<thickness_mm>:<si|cu>".
+MAT_CP = 5
+COLDPLATE = {"si": ("150.0", "2330", "700"), "cu": ("400.0", "8960", "385")}   # k, rho, c
+
 
 def load_schedule(csv_path):
     rows = []
@@ -76,12 +83,17 @@ def load_schedule(csv_path):
     return rows
 
 
-def generate(csv_path, out_inp, out_csv, monitor="apic"):
+def generate(csv_path, out_inp, out_csv, monitor="apic", coldplate=None):
     rows = load_schedule(csv_path)
     peak_w = max(p for _, _, p in rows)
     scale = XPU_PEAK_TARGET_W / peak_w
 
     z = {}
+    cp_t, cp_mat = (0.0, None)
+    if coldplate:
+        mm, mat = coldplate.split(":")
+        cp_t, cp_mat = float(mm) * 1e-3, mat.lower()
+    z["cp0"] = -cp_t          # cold plate sits above the XPU (negative z); coolant on its top face
     z["xpu0"] = 0.0
     z["xpu1"] = z["xpu0"] + T_XPU
     z["b1_1"] = z["xpu1"] + T_BOND
@@ -102,7 +114,10 @@ def generate(csv_path, out_inp, out_csv, monitor="apic"):
     a("ET,1,SOLID70")
     a(f"ESIZE,{W}/{ND}")
 
-    layers = [
+    if cp_t > 0:
+        k, rho, c = COLDPLATE[cp_mat]
+        a(f"MP,KXX,{MAT_CP},{k} $ MP,KYY,{MAT_CP},{k} $ MP,KZZ,{MAT_CP},{k} $ MP,DENS,{MAT_CP},{rho} $ MP,C,{MAT_CP},{c}")
+    layers = ([("cp0", "xpu0", MAT_CP)] if cp_t > 0 else []) + [
         ("xpu0", "xpu1", MAT_SI),
         ("xpu1", "b1_1", MAT_BOND_ACTIVE),
         ("b1_1", "eic1", MAT_SI),
@@ -124,7 +139,7 @@ def generate(csv_path, out_inp, out_csv, monitor="apic"):
     a(f"ESEL,S,MAT,,{MAT_APIC} $ BFE,ALL,HGEN,1,{APIC_POWER_W}/{vol_apic} $ ALLSEL")
 
     # boundary conditions: top = liquid cold plate on XPU, bottom = weak path to package substrate
-    a(f"ASEL,S,LOC,Z,{z['xpu0']} $ SFA,ALL,,CONV,{HCP_TOP},{T_COOLANT_C} $ ALLSEL")
+    a(f"ASEL,S,LOC,Z,{z['cp0'] if cp_t > 0 else z['xpu0']} $ SFA,ALL,,CONV,{HCP_TOP},{T_COOLANT_C} $ ALLSEL")
     a(f"ASEL,S,LOC,Z,{z['intp1']} $ SFA,ALL,,CONV,{H_BOTTOM:.4f},{T_COOLANT_C} $ ALLSEL")
 
     # monitor node: aPIC layer center (where the MRR sits)
@@ -164,11 +179,12 @@ def generate(csv_path, out_inp, out_csv, monitor="apic"):
         f.write("\n".join(lines) + "\n")
     print(f"wrote {out_inp}  (peak XPU power {peak_w}W -> scaled x{scale:.3f} to {XPU_PEAK_TARGET_W}W; "
           f"{len(rows)} load steps; EIC={EIC_POWER_W:.1f}W aPIC={APIC_POWER_W:.1f}W const; "
-          f"H_BOTTOM={H_BOTTOM:.1f} W/m2K)")
+          f"H_BOTTOM={H_BOTTOM:.1f} W/m2K; cold plate {coldplate or 'none'})")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        print("usage: gen_pic_transient.py <power_schedule.csv> <out.inp> <out_csv_basename>")
+    if len(sys.argv) not in (4, 5):
+        print("usage: gen_pic_transient.py <power_schedule.csv> <out.inp> <out_csv_basename> [cp=<mm>:<si|cu>]")
         sys.exit(1)
-    generate(sys.argv[1], sys.argv[2], sys.argv[3])
+    cp = sys.argv[4].split("=", 1)[1] if len(sys.argv) == 5 else None
+    generate(sys.argv[1], sys.argv[2], sys.argv[3], coldplate=cp)
