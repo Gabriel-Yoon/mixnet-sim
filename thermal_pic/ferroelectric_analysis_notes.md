@@ -55,6 +55,21 @@ Real a2a rounds (Job A, paper matrices): LLaMA 0.37 ms mean / 0.84 max; Mixtral 
 Qwen 25.8 / 137.8 — vs 350 ms assumed (27x-1000x). Mixtral/Qwen rounds are long because their
 EP blocks (32 / 64 GPUs) span 2 / 4 wafers and cross the 200 GB/s gateways.
 
+## 3b. Hardware cross-validation (Job C, one H100 SXM, NVML 20 ms, integer-C sensor)
+Two thermal timescales on a real, conventionally packaged GPU:
+- SLOW (package/cold plate): tau = 6-7 s heating, 9 s cooling; 60 s on/off swings 34 C.
+- FAST (die/junction sensor): per-cycle swing ~12 C for 300 ms on / 350 ms off, ~2-5 C (max 7-12)
+  for 35 ms bursts (power separation small because 35 ms fits only 4 GEMMs at reduced clocks).
+The ANSYS OIO3D stack (aPIC ~100 um below the XPU, direct microchannel cooling, tau ~16 ms) gives
+10-12 K swings for the same burst lengths -> the FAST component is consistent with measurement
+within ~2x; the SLOW component is absent from the model (no package mass) and is exactly the
+slow drift the programmable non-volatile setpoint (role 2) has to absorb. Cold-plate-mass
+sensitivity (B5) bridges the two.
+Real 8xH100 MoE fwd+bwd loop (bf16): a2a = 44% of a 1.59 s iteration; fwd dispatch 2.7 ms vs
+fwd combine 47 ms vs bwd dispatch 98 ms at equal bytes (overlap asymmetry) — supports the paper's
+"a2a is one-third to one-half of iteration time" claim and the equal-bytes assumption of
+-a2a-symmetric, but not equal latency per direction.
+
 ## 3. Endurance, recounted
 Per TRUE training iteration (batch 128 / microbatch 8 = 16 microbatches; the thermal "iteration"
 in the current paper is one microbatch through one layer):
