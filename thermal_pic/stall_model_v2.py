@@ -34,6 +34,7 @@ MODELS = [
 MODELS_SIM = [
     ("Mixtral-8x7B", "mixtral", "mixtral_power_schedule_{tag}.csv"),
     ("LLaMA-MoE-6.7B", "llama", "llama_power_schedule_{tag}.csv"),
+    ("Qwen-MoE-14.3B", "qwen", "qwen_power_schedule_{tag}.csv"),
 ]
 
 Q_FACTOR = 8000.0
@@ -164,14 +165,25 @@ def load_a2a_windows(path):
 
 
 def per_a2a_round_stall(t, eps, eps_max, wins, dt_s):
-    """Stall time (ms) overlapping each all-to-all round [ready, finish] of the device's layer,
-    after startup; this is the quantity to inject per round in htsim."""
+    """Delay (ms) a round of the device's layer suffers, matching htsim's one-time-stall-before-
+    the-round semantics: if the round becomes ready while the ring is out of budget, it waits for
+    the remainder of that stall window; any further stall inside the (shifted) round adds to it."""
     out = []
+    n = len(t)
     for s, e, info, it in wins:
         if s < STARTUP_SKIP_S:
             continue
-        i0, i1 = bisect.bisect_left(t, s), bisect.bisect_left(t, e)
-        out.append((sum(dt_s for i in range(i0, i1) if eps[i] > eps_max) * 1000.0, info, it))
+        i0 = min(bisect.bisect_left(t, s), n - 1)
+        rem = 0.0
+        if eps[i0] > eps_max:
+            j = i0
+            while j < n and eps[j] > eps_max:
+                j += 1
+            rem = (t[min(j, n - 1)] - t[i0])
+        s2, e2 = s + rem, e + rem
+        k0, k1 = bisect.bisect_left(t, s2), bisect.bisect_left(t, e2)
+        inside = sum(dt_s for i in range(k0, k1) if eps[i] > eps_max)
+        out.append(((rem + inside) * 1000.0, info, it))
     return out
 
 

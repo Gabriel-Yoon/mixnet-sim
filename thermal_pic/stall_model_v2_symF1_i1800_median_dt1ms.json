@@ -64,15 +64,15 @@
   "ff10x_mean_ms": 4.066969353007946,
   "heater_bias_mw": 3.290751999986885,
   "a2a_rounds": {
-   "mean_ms": 18.804964539007095,
-   "max_ms": 36.00000000000003,
-   "per_iter_ms": 589.2222222222223,
+   "mean_ms": 28.460992907799724,
+   "max_ms": 52.00000000001037,
+   "per_iter_ms": 891.7777777777247,
    "n_rounds": 282,
    "by_type": {
-    "AGGREGATE forward all2all": 22.114285714285717,
-    "GROUP_BY forward all2all": 19.279411764705884,
-    "AGGREGATE backward all2all": 15.875000000000004,
-    "GROUP_BY backward all2all": 18.069444444444446
+    "AGGREGATE forward all2all": 32.37142857142675,
+    "GROUP_BY forward all2all": 26.67647058823385,
+    "AGGREGATE backward all2all": 28.347222222220132,
+    "GROUP_BY backward all2all": 26.458333333331836
    }
   }
  },
@@ -141,15 +141,15 @@
   "ff10x_mean_ms": 5.1987577639751565,
   "heater_bias_mw": 3.2181439999950454,
   "a2a_rounds": {
-   "mean_ms": 0.6479591836734694,
-   "max_ms": 1.0,
-   "per_iter_ms": 18.142857142857142,
+   "mean_ms": 31.19387755101754,
+   "max_ms": 80.99999999999108,
+   "per_iter_ms": 873.4285714284912,
    "n_rounds": 196,
    "by_type": {
-    "AGGREGATE backward all2all": 0.62,
-    "GROUP_BY backward all2all": 0.52,
-    "GROUP_BY forward all2all": 0.625,
-    "AGGREGATE forward all2all": 0.8333333333333334
+    "AGGREGATE backward all2all": 23.739999999998616,
+    "GROUP_BY backward all2all": 18.73999999999891,
+    "GROUP_BY forward all2all": 46.29166666666157,
+    "AGGREGATE forward all2all": 36.833333333329286
    }
   }
  }
