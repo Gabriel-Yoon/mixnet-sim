@@ -1,4 +1,4 @@
-# Consolidated results for the revision (as of 2026-09-28)
+# Consolidated results for the revision (final, 2026-09-28; simulation campaign complete)
 
 All htsim numbers: L4 seq4096 task graphs, paper routing matrices, `-a2a-symmetric` (dispatch sized
 like combine), makespan = stderr "finished one iter". Thermal: ANSYS OIO3D stack (Coenen params),
@@ -24,7 +24,7 @@ Knee at 400 GB/s per port; 800 saturates. LLaMA flat across port rates (never le
 |---|---|---|---|---|
 | Mixtral | 865.3 | 1370.5 | 1.58x | 50.8 / 26.7 / 26.3 / 7.2 |
 | LLaMA | 494.4 | 1395.6 | 2.82x | 61.2 / 47.9 / 24.5 / 29.0 |
-| Qwen | 661.3 | (J3 pending) | — | 20.9 / 11.2 / 6.7 / 11.5 |
+| Qwen | 661.3 | 1179.4 | 1.78x | 20.9 / 11.2 / 6.7 / 11.5 |
 Legacy gateway model, same semantics not run; old-semantics H runs: Mixtral +54% (1800) / +120% (256),
 LLaMA +1.4% / +22% (superseded).
 
@@ -56,7 +56,7 @@ Closed loop: iteration 2 within ~1–10% of iteration 1 (converged).
 | gateway model + stall (H3→H5) | −43.9% | −8.6% | — |
 | port 800, expert-matrix demand | +0.8% | −10.5% | — |
 | port 800, measured demand floor 0.5 | −3.4% | — | — |
-| port 800 + stall (J) | −2.9% (measured) | +0.9% | (J6 pending) |
+| port 800 + stall (J) | −2.9% (measured) | +0.9% | +1.3% |
 Reading: reassignment is a lever when the intra-wafer mesh / gateway is the bottleneck; it does not
 shorten the stall-dominated serialized round chain. Receiver ring over-provisioning: 1.41x (cap 2x).
 
