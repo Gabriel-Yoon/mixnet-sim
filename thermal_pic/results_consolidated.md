@@ -104,3 +104,18 @@ Device classes quoted: Mixtral median / LLaMA cold / Qwen median unless noted.
 - Athermal LN, residual 0.37 pm/K^2 (Ling 2020), worst detuning with the setpoint centred, athermal point 0/3/5/34 K from the mean
   operating temperature: Mixtral 7/16/23/146 pm; LLaMA 5/12/18/127; Qwen 1/2/5/40. Budget 19.4 pm -> tolerance about 3 K.
 - NVSwitch 7.5 / 12.5 W per GPU has no public source (assumption). 1.15 pJ/b (Hsueh Table 1) excludes the laser.
+
+## T9. Job K (peer, 2026-09-29; artefacts @d1b7edf) — Qwen at the design point, baselines, one-method reassignment
+- K3 Qwen port-800 ANSYS: swing 4.76 K (median dev287) / 5.11 K (cold dev0), mean 56.2 / 56.1 C, duty 11 %,
+  rounds 21–47 ms (median 22), cooling slope median -0.043, max -0.16 K/ms. (Cold trace's first sample 67.2 C is an initial-condition artefact.)
+- K4 map (max over classes) GBf/AGGf/GBb/AGGb 17.2 / 16.6 / 6.0 / 12.9 ms; per-round mean 11.5 (median) / 9.5 (cold) ms.
+- K5 Qwen with stall 1205.4 ms (1.82x vs 661.3); + demand 1244.7. Loop 2 running (map moved >10 %).
+- K6 injected bytes per GPU per iteration: LLaMA 17.5, Qwen 17.9, Mixtral 19.2 GB (end-to-end, per source).
+- K9 Qwen intra 256/512/1024 GB/s at port 800: 661.3 / 682.2 / 648.6 ms (mean round 23.5/23.5/22.6) -> not intra-bandwidth-bound.
+  Fat-tree at 2.3 TB/s per GPU: Mixtral 839.3, LLaMA 426.3 (vs 841.3 / 427.4 at 1.5); Qwen pending.
+- K10 expert-matrix demand (floor 0.1, cap 2), port 800, stall-free / with stall vs uniform:
+  Mixtral +0.8 % / +0.7 %, LLaMA -10.5 % / +0.9 %, Qwen +4.4 % / +3.3 %.
+- Qwen follow-ups (ROM, port-800 pair): budget 25/30 % FWHM 5.6/4.4 ms; Q/eps range 4.1–16.3 ms; peak 420 W 3.8 ms;
+  loop bandwidth 10/30/100 Hz 24.6/11.1/1.3 ms; dummy load 350/525 W 4.2/0.3 ms (+237/+396 W); athermal 0/3/5/34 K -> 2/3/7/58 pm;
+  full depth 11.0 -> 10.8 (median), 8.8 -> 9.7 (cold) ms -> ~1.8x.
+- Superseded: Qwen 3.3 K / 11 ms / 21-11-7-12 map / 1.78x (i1800 trace).

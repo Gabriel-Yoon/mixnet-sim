@@ -28,8 +28,8 @@ PAIRS = {
     "mixtral_cold": ("mixtral_power_schedule_port800_cold.csv", "mixtral_pic_transient_port800_cold_dt1ms.csv"),
     "llama_median": ("llama_power_schedule_port800_median.csv", "llama_pic_transient_port800_median_dt1ms.csv"),
     "llama_cold": ("llama_power_schedule_port800_cold.csv", "llama_pic_transient_port800_cold_dt1ms.csv"),
-    "qwen_median": ("qwen_power_schedule_i1800_median.csv", "qwen_pic_transient_i1800_median_dt1ms.csv"),
-    "qwen_cold": ("qwen_power_schedule_i1800_cold.csv", "qwen_pic_transient_i1800_cold_dt1ms.csv"),
+    "qwen_median": ("qwen_power_schedule_port800_median.csv", "qwen_pic_transient_port800_median_dt1ms.csv"),
+    "qwen_cold": ("qwen_power_schedule_port800_cold.csv", "qwen_pic_transient_port800_cold_dt1ms.csv"),
 }
 # full model depth / pipeline stages -> layers held by one device
 LAYERS_PER_STAGE = {"mixtral": 32 // 4, "llama": 32 // 4, "qwen": 24 // 4}

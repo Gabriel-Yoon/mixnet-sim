@@ -51,7 +51,7 @@ DT = 0.001
 MODELS = [  # label, color, trace, schedule, stall-free / stalled iteration (ms)
     ("Mixtral 8×7B", BLUE, "mixtral_pic_transient_port800_median_dt1ms.csv", "mixtral_power_schedule_port800_median.csv", 865.3, 1370.5),
     ("LLaMA-MoE 6.7B", GREEN, "llama_pic_transient_port800_cold_dt1ms.csv", "llama_power_schedule_port800_cold.csv", 494.4, 1395.6),
-    ("Qwen-MoE 14.3B", ORANGE, "qwen_pic_transient_i1800_median_dt1ms.csv", "qwen_power_schedule_i1800_median.csv", 661.3, 1179.4),
+    ("Qwen-MoE 14.3B", ORANGE, "qwen_pic_transient_port800_median_dt1ms.csv", "qwen_power_schedule_port800_median.csv", 661.3, 1205.4),
 ]
 FAT = {"Mixtral 8×7B": 841.3, "LLaMA-MoE 6.7B": 427.4, "Qwen-MoE 14.3B": 195.4}
 
@@ -344,9 +344,9 @@ def fig_reassignment():
 
     ax2 = fig.add_subplot(gs[0, 1])
     labels = ["Mixtral\n8×7B", "LLaMA-MoE\n6.7B", "Qwen-MoE\n14.3B"]
-    mesh = [-36.0, -9.0, -10.4]
-    port = [-3.4, -10.5, None]
-    port_stall = [-2.9, 0.9, 1.3]
+    mesh = [-12.3, -9.0, -10.4]  # expert-matrix demand, gateway model (qwen without symmetric dispatch)
+    port = [0.8, -10.5, 4.4]  # K10: expert-matrix demand, floor 0.1, cap 2, port 800
+    port_stall = [0.7, 0.9, 3.3]  # K10 with stall (qwen with the port-800 map)
     xs = range(3)
     ax2.bar([x - 0.27 for x in xs], mesh, width=0.25, color=MUTED, label="mesh/gateway-bound fabric")
     ax2.bar([x for x in xs], [v or 0 for v in port], width=0.25, color=BLUE, label="CPO ports 800 GB/s, stall-free")
@@ -357,14 +357,14 @@ def fig_reassignment():
             if v is None:
                 ax2.text(x + dx, 0.8, "n/a", ha="center", fontsize=6, color=SEC_INK)
             else:
-                ax2.text(x + dx, v - 2.0 if v < 0 else v + 0.8, f"{v:+.0f}%", ha="center", va="top" if v < 0 else "bottom", fontsize=6.3, color=INK)
+                ax2.text(x + dx, v - 0.6 if v < 0 else v + 0.3, f"{v:+.1f}%", ha="center", va="top" if v < 0 else "bottom", fontsize=6.3, color=INK)
     ax2.axhline(0, color=SEC_INK, linewidth=0.6)
     style(ax2)
     ax2.set_xticks(list(xs))
     ax2.set_xticklabels(labels)
     ax2.set_ylabel("iteration-time change vs uniform λ (%)")
-    ax2.set_ylim(-43, 12)
-    ax2.legend(frameon=False, loc="lower right", handlelength=1.3, fontsize=6.3)
+    ax2.set_ylim(-16, 8)
+    ax2.legend(frameon=False, loc="upper left", handlelength=1.3, fontsize=6.3, ncol=1)
     panel(ax2, "(b)", dx=-0.22, dy=0.97)
     save(fig, "fig_reassignment")
 
