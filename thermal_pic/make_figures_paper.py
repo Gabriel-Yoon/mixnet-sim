@@ -176,8 +176,8 @@ def fig_headline():
     labels = [m[0] for m in MODELS]
     free, stall = [m[4] for m in MODELS], [m[5] for m in MODELS]
     xs = range(3)
-    ax2.bar([x - 0.19 for x in xs], free, width=0.36, color=MUTED, label="athermal ring + programmable setpoint")
-    ax2.bar([x + 0.19 for x in xs], stall, width=0.36, color=BLUE, label="thermo-optic tuning (stall)")
+    ax2.bar([x - 0.19 for x in xs], free, width=0.36, color=MUTED, label="no tuning stall")
+    ax2.bar([x + 0.19 for x in xs], stall, width=0.36, color=BLUE, label="thermo-optic tuning, 5 nm/s loop")
     ax2.scatter(list(xs), [FAT[l] for l in labels], marker="_", s=180, color=INK, linewidths=1.2, zorder=5, label="ideal fat-tree")
     for x, f, s in zip(xs, free, stall):
         ax2.text(x + 0.19, s + 25, f"{s/f:.2f}×", ha="center", fontsize=7.5, color=INK)

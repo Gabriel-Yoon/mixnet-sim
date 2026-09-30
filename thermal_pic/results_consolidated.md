@@ -82,3 +82,25 @@ shorten the stall-dominated serialized round chain. Receiver ring over-provision
 4. Table 7 "our design" ran at 1800/200 GB/s, not 400 Gbps; replaced by iso-injection comparison.
 5. Simulated iteration = 4 micro-batch ids (not batch 128 / mb 8 as Table 2 implies).
 6. Per-wafer-pair single gateway replaced by per-reticle CPO ports.
+
+## T8. Mock-review follow-up analyses (2026-09-29, local; scripts rom_fulldepth.py, review_extra_analyses.py, review_loop_athermal.py)
+All on the design-point ANSYS traces (Qwen still i1800 until Job K). Delay = mean per a2a round, wait-for-remaining-stall semantics.
+Device classes quoted: Mixtral median / LLaMA cold / Qwen median unless noted.
+- Round durations (a2a windows): Mixtral 0.40 ms, LLaMA 4.45 ms, Qwen 42–75 ms. The old statement "LLaMA 0.4–5 ms, Qwen 27 ms;
+  shortest rounds lose most" was wrong and is removed from the manuscript.
+- ROM: two lags 12 ms / 30 ms, gains 1.51 / 10.96 K at full power (fit on mixtral_median). rmse 0.10–0.26 K on 5 traces;
+  qwen_cold rmse 12.4 K (schedule and ANSYS run do not correspond). Delay ANSYS vs ROM: 27.7/29.5, 19.6/13.4, 38.9/35.0, 11.2/10.6, 10.2/9.7.
+- Full depth (synthetic schedules, ROM): Mixtral 14.6 ms, LLaMA 15.5 (median) / 11.2 (cold), Qwen 12.5 / 11.4.
+  Penalty estimate 1.3x / 1.8x (1.6–3.1x by single device class) / 1.9x.
+- Budget sweep 5/10/15/20/25/30 % FWHM: Mixtral 30.7/27.7/26.5/25.5/25.1/24.8; LLaMA cold 40.4/38.9/37.4/34.6/31.8/27.4;
+  Qwen 12.6/11.2/10.0/8.8/7.6/6.4. (10 % FWHM = 0.17 dB Lorentzian, 25 % = 1 dB.)
+- Peak burst power 700/560/420 W (ROM): Mixtral 29.5/24.0/9.9; LLaMA cold 35.0/20.8/10.3; Qwen 10.6/8.2/4.7 ms.
+- Loop bandwidth (first-order, no slew limit) 10/30/100/300 Hz: Mixtral 15.0/4.9/1.2/0; LLaMA 14.5/6.7/0.8/0; Qwen 37.2/9.1/1.7/0.
+  With the 5 nm/s slew limit kept, bandwidth does not matter (27.7 / 38.9 / 11.2 at 100 Hz and 1 kHz).
+- Dummy load (idle floor 175/350/525 W): Mixtral 26.5/10.2/1.0 ms (+44/130/216 W); LLaMA cold 24.7/10.4/0.3 (+54/158/265);
+  Qwen 8.8/4.9/0.9 (+86/253/421).
+- Feed-forward from the power command through the ROM, late by 0/1/2/5/10 ms: Mixtral 0.3/0.0/0.0/1.1/3.3; LLaMA 0.7/0.2/1.8/3.6/8.2;
+  Qwen 0.5/0.4/1.9/7.1/15.4. T4's "3/13/31/47 ms" used the superseded overlap-only semantics; Fig. mitigation(b) is current.
+- Athermal LN, residual 0.37 pm/K^2 (Ling 2020), worst detuning with the setpoint centred, athermal point 0/3/5/34 K from the mean
+  operating temperature: Mixtral 7/16/23/146 pm; LLaMA 5/12/18/127; Qwen 1/2/5/40. Budget 19.4 pm -> tolerance about 3 K.
+- NVSwitch 7.5 / 12.5 W per GPU has no public source (assumption). 1.15 pJ/b (Hsueh Table 1) excludes the laser.
